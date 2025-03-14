@@ -1,8 +1,14 @@
+cmake_minimum_required(VERSION 3.15)
 project(genicam CXX)
 
+# Architecture detection
 if (UNIX)
-  # try to get architecture from compiler
-  EXECUTE_PROCESS(COMMAND ${CMAKE_CXX_COMPILER} -dumpmachine COMMAND tr -d '\n' OUTPUT_VARIABLE CXX_MACHINE)
+  # Try to get architecture from compiler
+  EXECUTE_PROCESS(
+    COMMAND ${CMAKE_CXX_COMPILER} -dumpmachine
+    COMMAND tr -d "\n"
+    OUTPUT_VARIABLE CXX_MACHINE
+  )
   string(REGEX REPLACE "([a-zA-Z_0-9]+).*" "\\1" ARCHITECTURE ${CXX_MACHINE})
 elseif (WIN32)
   if ("${CMAKE_SIZEOF_VOID_P}" STREQUAL "4")
@@ -14,8 +20,8 @@ endif ()
 
 message(STATUS "Detected architecture ${ARCHITECTURE}")
 
+# Setup library names, directories, and suffix based on architecture
 set(GENICAM_LIB_SUFFIX)
-
 if ("${ARCHITECTURE}" STREQUAL "arm")
   set(GENICAM_LIBRARIES
     libGCBase_gcc494_v3_4
@@ -65,10 +71,6 @@ elseif ("${ARCHITECTURE}" STREQUAL "x86_64")
   set(GENICAM_LIBRARIES_DIR ${CMAKE_CURRENT_SOURCE_DIR}/bin/Linux64_x64)
   set(GENICAM_LIB_SUFFIX ".so")
 elseif ("${ARCHITECTURE}" STREQUAL "WIN32_i86")
-  install(DIRECTORY
-    ${CMAKE_CURRENT_SOURCE_DIR}/bin/Win32_i86/
-	COMPONENT bin DESTINATION ${CMAKE_INSTALL_BINDIR}
-  )
   set(GENICAM_LIBRARIES
     GCBase_MD_VC141_v3_4
     GenApi_MD_VC141_v3_4
@@ -76,10 +78,6 @@ elseif ("${ARCHITECTURE}" STREQUAL "WIN32_i86")
   set(GENICAM_LIBRARIES_DIR ${CMAKE_CURRENT_SOURCE_DIR}/library/CPP/lib/Win32_i86)
   set(GENICAM_LIB_SUFFIX ".lib")
 elseif ("${ARCHITECTURE}" STREQUAL "WIN64_x64")
-  install(DIRECTORY
-    ${CMAKE_CURRENT_SOURCE_DIR}/bin/Win64_x64/
-	COMPONENT bin DESTINATION ${CMAKE_INSTALL_BINDIR}
-  )
   set(GENICAM_LIBRARIES
     GCBase_MD_VC141_v3_4
     GenApi_MD_VC141_v3_4
@@ -90,26 +88,38 @@ else ()
   message(FATAL_ERROR "Unknown architecture")
 endif ()
 
+# Build the full paths for each library file
 set(GENICAM_LIBRARIES_IN_BUILD_DIR)
 foreach(GENICAM_LIB ${GENICAM_LIBRARIES})
   set(GENICAM_LIB_FILE "${GENICAM_LIBRARIES_DIR}/${GENICAM_LIB}${GENICAM_LIB_SUFFIX}")
   list(APPEND GENICAM_LIBRARIES_IN_BUILD_DIR "${GENICAM_LIB_FILE}")
 endforeach()
 
-if(CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME)
-  install(FILES ${GENICAM_LIBRARIES_IN_BUILD_DIR} COMPONENT bin DESTINATION ${GENICAM_INSTALL_LIBDIRS})
+# Create an INTERFACE target to expose headers and library paths
+add_library(genicam INTERFACE)
+target_include_directories(genicam INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/library/CPP/include)
+target_link_libraries(genicam INTERFACE ${GENICAM_LIBRARIES_IN_BUILD_DIR})
+
+# Only run install commands when repo A is the main project
+if (CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME)
+  # For Windows architectures, install binary directories (if applicable)
+  if ("${ARCHITECTURE}" STREQUAL "WIN32_i86" OR "${ARCHITECTURE}" STREQUAL "WIN64_x64")
+    install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/bin/${ARCHITECTURE}/
+      COMPONENT bin
+      DESTINATION ${CMAKE_INSTALL_BINDIR}
+    )
+  endif()
+
+  install(FILES ${GENICAM_LIBRARIES_IN_BUILD_DIR}
+    COMPONENT bin
+    DESTINATION ${GENICAM_INSTALL_LIBDIRS}
+  )
+
+  # Install headers only if shared libraries are being built
+  if (BUILD_SHARED_LIBS)
+    install(DIRECTORY library/CPP/include/
+      COMPONENT dev
+      DESTINATION ${GENICAM_INSTALL_INCLUDEDIRS}
+    )
+  endif()
 endif()
-
-add_library(genicam_lib INTERFACE)
-target_include_directories(genicam_lib INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/library/CPP/include)
-
-# install(DIRECTORY licenses/ COMPONENT bin DESTINATION ${CMAKE_INSTALL_DOCDIR}/GenICam/)
-
-# message(STATUS "GENICAM_LIBRARIES: ${GENICAM_INSTALL_LIBDIRS}")
-
-# only install headers if we build and install the shared lib
-if (BUILD_SHARED_LIBS)
-  install(DIRECTORY library/CPP/include/ COMPONENT dev DESTINATION ${GENICAM_INSTALL_INCLUDEDIRS})
-endif ()
-
-# message(STATUS "GENICAM_INSTALL_INCLUDEDIRS: ${GENICAM_INSTALL_INCLUDEDIRS}")
