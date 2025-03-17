@@ -1,6 +1,9 @@
 cmake_minimum_required(VERSION 3.15)
 project(genicam CXX)
 
+# Include GNUInstallDirs to provide standard installation directory variables
+include(GNUInstallDirs)
+
 # Architecture detection
 if (UNIX)
   # Try to get architecture from compiler
@@ -112,14 +115,14 @@ if (CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME)
 
   install(FILES ${GENICAM_LIBRARIES_IN_BUILD_DIR}
     COMPONENT bin
-    DESTINATION ${GENICAM_INSTALL_LIBDIRS}
+    DESTINATION ${CMAKE_INSTALL_LIBDIR}
   )
 
   # Install headers only if shared libraries are being built
   if (BUILD_SHARED_LIBS)
     install(DIRECTORY library/CPP/include/
       COMPONENT dev
-      DESTINATION ${GENICAM_INSTALL_INCLUDEDIRS}
+      DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
     )
   endif()
 endif()
